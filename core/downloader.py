@@ -1,4 +1,4 @@
-import os
+﻿import os
 import sys
 import time
 import hashlib
@@ -346,7 +346,7 @@ def install_or_update_game(game_dir, progress_cb=None, log_cb=None):
             "гра може не запуститися. Перевірте інтернет або перевстановіть клієнт.")
     return libs_ok
 
-LAUNCHER_VERSION = "1.3.4"
+LAUNCHER_VERSION = "1.3.5"
 
 def is_newer_version(remote, current):
     """Перевіряє, чи віддалена версія новіша за поточну."""
