@@ -67,6 +67,24 @@ def get_latest_github_release():
         print(f"Error fetching latest release: {e}")
     return None
 
+def get_latest_client_jar_asset(release=None):
+    """
+    Знаходить найновіший (останній залитий за updated_at / created_at)
+    jar-файл Lunarix Client серед ассетів релізу на GitHub.
+    """
+    rel = release or get_latest_github_release()
+    if not rel:
+        return None
+    candidates = []
+    for a in rel.get("assets", []):
+        n = a.get("name", "").lower()
+        if n.startswith("lunarix") and n.endswith(".jar"):
+            candidates.append(a)
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: str(x.get("updated_at") or x.get("created_at") or ""), reverse=True)
+    return candidates[0]
+
 def fetch_remote_manifest():
     """Отримує актуальний manifest.json напряму через GitHub API."""
     url = f"{GITHUB_API_BASE}/contents/manifest.json"
@@ -100,8 +118,11 @@ def download_github_asset(asset_url, target_path, progress_cb=None, expected_siz
                     pct = min(1.0, downloaded / total_size)
                     progress_cb(pct, f"Завантаження {filename}: {downloaded // (1024*1024)}MB / {total_size // (1024*1024)}MB")
         if os.path.exists(target_path):
-            os.remove(target_path)
-        os.rename(temp_target, target_path)
+            try:
+                os.remove(target_path)
+            except Exception:
+                pass
+        shutil.move(temp_target, target_path)
         return True
     except Exception as e:
         if os.path.exists(temp_target):
@@ -237,15 +258,10 @@ def install_or_update_game(game_dir, progress_cb=None, log_cb=None):
         progress_cb(0.3, f"Перевірка версії клієнта ({tag_name})...")
 
     target_mod_name = None
-    target_mod_asset = None
-    if rel:
-        for a_name, a_data in assets_by_name.items():
-            if a_name.lower().startswith("lunarix-client") and a_name.endswith(".jar"):
-                target_mod_name = a_name
-                target_mod_asset = a_data
-                break
-
-    if not target_mod_name:
+    target_mod_asset = get_latest_client_jar_asset(rel)
+    if target_mod_asset:
+        target_mod_name = target_mod_asset.get("name")
+    else:
         target_mod_name = "Lunarix-Client-1.21.11-1.0.jar"
 
     target_mod_path = os.path.join(mods_dir, target_mod_name)
@@ -259,8 +275,21 @@ def install_or_update_game(game_dir, progress_cb=None, log_cb=None):
             except Exception:
                 pass
 
+    # Перевіряємо актуальність за manifest.json (sha1) або за розміром останнього залитого файлу
+    manifest = fetch_remote_manifest()
+    expected_mod_sha1 = None
+    if manifest:
+        for item in manifest.get("files", []):
+            p = item.get("path", "")
+            base = os.path.basename(p).lower()
+            if p.startswith("mods/") and base.startswith("lunarix-client") and base.endswith(".jar"):
+                expected_mod_sha1 = (item.get("sha1") or "").lower() or None
+                break
+
     need_mod_download = False
     if not os.path.exists(target_mod_path):
+        need_mod_download = True
+    elif expected_mod_sha1 and get_sha1(target_mod_path) != expected_mod_sha1:
         need_mod_download = True
     elif target_mod_asset and target_mod_asset.get("size", 0) > 0:
         if os.path.getsize(target_mod_path) != target_mod_asset["size"]:
@@ -363,18 +392,32 @@ def check_launcher_update(current_version=LAUNCHER_VERSION):
 
 def check_client_update(game_dir):
     """
-    Проверяет, есть ли обновление Lunarix Client для установленной игры.
-    Сравнивает локальный mods/Lunarix-Client*.jar с manifest.json на GitHub
-    (по sha1) или, если манифест недоступен, с размером jar-асета последнего релиза.
-    Возвращает (has_update: bool, update_info: dict).
+    Перевіряє, чи є оновлення Lunarix Client для гри.
+    Знаходить останній залитий jar-файл у релізі на GitHub (за датою оновлення updated_at),
+    порівнює його хеш SHA-1 із локальним файлом у mods/ (або розмір, якщо хешу нема в маніфесті).
+    Повертає (has_update: bool, update_info: dict).
     """
     try:
         if not game_dir or not os.path.isdir(game_dir):
             return False, None
 
         mods_dir = os.path.join(game_dir, "mods")
+
+        rel = get_latest_github_release()
+        latest_asset = get_latest_client_jar_asset(rel)
+        if not latest_asset:
+            return False, None
+
+        remote_name = latest_asset.get("name", "")
+        remote_size = int(latest_asset.get("size") or 0)
+        remote_version = rel.get("tag_name", "v1.0.0") if rel else "v1.0.0"
+
+        # Знаходимо поточний локальний jar у mods
         local_jar = None
-        if os.path.isdir(mods_dir):
+        target_local_path = os.path.join(mods_dir, remote_name) if remote_name else None
+        if target_local_path and os.path.isfile(target_local_path):
+            local_jar = target_local_path
+        elif os.path.isdir(mods_dir):
             for f in os.listdir(mods_dir):
                 fl = f.lower()
                 if fl.startswith("lunarix-client") and fl.endswith(".jar"):
@@ -384,56 +427,48 @@ def check_client_update(game_dir):
         if local_jar is None and not is_game_installed(game_dir):
             return False, None
 
+        # Отримуємо очікуваний SHA-1 з manifest.json (якщо є)
         expected_sha1 = None
-        expected_size = 0
-        remote_version = ""
-
         manifest = fetch_remote_manifest()
         if manifest:
-            remote_version = str(manifest.get("client_version", "") or "")
             for item in manifest.get("files", []):
                 p = item.get("path", "")
                 base = os.path.basename(p).lower()
-                if p.startswith("mods/") and base.startswith("lunarix-client") and base.endswith(".jar"):
+                if base == remote_name.lower() or (p.startswith("mods/") and base.startswith("lunarix-client") and base.endswith(".jar")):
                     expected_sha1 = (item.get("sha1") or "").lower() or None
-                    try:
-                        expected_size = int(item.get("size") or 0)
-                    except Exception:
-                        expected_size = 0
                     break
 
-        if not expected_sha1 and not expected_size:
-            rel = get_latest_github_release()
-            if not rel:
-                return False, None
-            remote_version = rel.get("tag_name", "") or remote_version
-            for a in rel.get("assets", []):
-                n = a.get("name", "")
-                if n.lower().startswith("lunarix-client") and n.endswith(".jar"):
-                    expected_size = int(a.get("size") or 0)
-                    break
+        # Якщо локального файлу взагалі немає або назва інша
+        if local_jar is None or os.path.basename(local_jar).lower() != remote_name.lower():
+            return True, {
+                "version": remote_version,
+                "filename": remote_name,
+                "size": remote_size,
+                "url": latest_asset.get("url"),
+            }
 
-        if expected_sha1 is None and expected_size == 0:
-            return False, None
-
-        if local_jar is None:
-            return True, {"version": remote_version or "new", "size": expected_size}
-
+        # Якщо є очікуваний sha1 з маніфесту
         if expected_sha1:
             if get_sha1(local_jar) != expected_sha1:
                 return True, {
-                    "version": remote_version or "new",
-                    "size": expected_size,
+                    "version": remote_version,
+                    "filename": remote_name,
+                    "size": remote_size,
                     "local_size": os.path.getsize(local_jar),
+                    "url": latest_asset.get("url"),
                 }
             return False, None
 
-        if expected_size and os.path.getsize(local_jar) != expected_size:
+        # Якщо маніфесту нема, порівнюємо розмір останнього файлу з гітхабу
+        if remote_size and os.path.getsize(local_jar) != remote_size:
             return True, {
-                "version": remote_version or "new",
-                "size": expected_size,
+                "version": remote_version,
+                "filename": remote_name,
+                "size": remote_size,
                 "local_size": os.path.getsize(local_jar),
+                "url": latest_asset.get("url"),
             }
+
         return False, None
     except Exception as e:
         print(f"[Client Update Check] Error: {e}")
