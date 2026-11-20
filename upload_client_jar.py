@@ -2,7 +2,7 @@
 """Оновлює Lunarix-Client-v1.2.1.jar у ТОМУ Ж релізі v1.0.0 + manifest.json."""
 import os, sys, json, time, hashlib, base64, urllib.request
 
-TOKEN = ""
+TOKEN = os.environ.get("GITHUB_TOKEN", "")
 OWNER = "SoSohik"
 REPO = "lunarix-client"
 RELEASE_ID = 445467632
