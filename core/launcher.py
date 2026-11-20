@@ -538,6 +538,10 @@ def launch_minecraft(cfg, log_cb=None, on_exit_cb=None, on_start_cb=None):
         "-Dstderr.encoding=UTF-8",
     ]
 
+    log4j_file = os.path.join(game_dir, "log4j2-client.xml")
+    if os.path.exists(log4j_file):
+        cmd.append(f"-Dlog4j.configurationFile={log4j_file}")
+
     if jvm_extra:
         cmd.extend(jvm_extra.split())
 
