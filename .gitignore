@@ -1,0 +1,10 @@
+dist/
+build/
+*.exe
+*.bak
+auth_session.json
+alts.json
+config.json
+profile/
+__pycache__/
+*.pyc
