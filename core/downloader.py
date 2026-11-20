@@ -73,7 +73,7 @@ def fetch_remote_manifest():
     req = urllib.request.Request(url, headers=get_headers(accept="application/vnd.github.raw"))
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            return json.loads(resp.read().decode("utf-8-sig"))
     except Exception as e:
         print(f"Error fetching manifest: {e}")
     return None
