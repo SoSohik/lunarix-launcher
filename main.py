@@ -1679,7 +1679,7 @@ class LunarixLauncherApp(ctk.CTk):
         # Load modern vector tab icons
         self.tab_icons = {}
         icons_dir = os.path.join(BASE_DIR, "assets", "tab_icons")
-        for t_id in ["home", "profile", "alts", "chat", "configs", "localcfg", "resourcepacks", "friends", "mods", "changelog", "settings", "logs"]:
+        for t_id in ["home", "profile", "alts", "chat", "configs", "localcfg", "resourcepacks", "friends", "mods", "changelog", "settings"]:
             act_path = os.path.join(icons_dir, f"{t_id}_active.png")
             inact_path = os.path.join(icons_dir, f"{t_id}_inactive.png")
             if os.path.exists(act_path) and os.path.exists(inact_path):
@@ -1704,7 +1704,6 @@ class LunarixLauncherApp(ctk.CTk):
             ("mods",          "tab_mods",          self._show_mods),
             ("changelog",     "tab_changelog",     self._show_changelog),
             ("settings",      "tab_settings",      self._show_settings),
-            ("logs",          "tab_logs",          self._show_logs),
         ]
 
         self.sidebar_nav_scroll = ctk.CTkScrollableFrame(self.sidebar, fg_color="transparent")
@@ -1783,7 +1782,6 @@ class LunarixLauncherApp(ctk.CTk):
         self._init_mods_view()
         self._init_changelog_view()
         self._init_settings_view()
-        self._init_logs_view()
 
     def _select_tab(self, tab_name):
         for t_id, btn in self.nav_btns.items():
@@ -5002,49 +5000,7 @@ class LunarixLauncherApp(ctk.CTk):
         )
         self.btn_clear_data.pack(anchor="w", padx=16, pady=(0, 12))
 
-    # ══════════════════════════════════════════════════════════════════════════
-    #  4. LOGS (CONSOLE) VIEW
-    # ══════════════════════════════════════════════════════════════════════════
-    def _init_logs_view(self):
-        self.logs_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
 
-        top = ctk.CTkFrame(self.logs_frame, fg_color="transparent")
-        top.pack(fill="x", pady=(0, 8))
-        self.lbl_logs_title = ctk.CTkLabel(
-            top, text="Консоль",
-            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold")
-        )
-        self.lbl_logs_title.pack(side="left")
-
-        self.btn_copy_logs = ctk.CTkButton(
-            top, text=self.tr("btn_copy_logs"), width=100, height=30,
-            fg_color=BG_GLASS_INNER, hover_color="#182c4d", corner_radius=10,
-            command=self._copy_logs_to_clipboard
-        )
-        self.btn_copy_logs.pack(side="right", padx=(6, 0))
-
-        self.btn_clear_logs = ctk.CTkButton(
-            top, text=self.tr("btn_clear_logs"), width=80, height=30,
-            fg_color=BG_GLASS_INNER, hover_color="#182c4d", corner_radius=10,
-            command=self._clear_logs
-        )
-        self.btn_clear_logs.pack(side="right")
-
-        self.log_textbox = ctk.CTkTextbox(
-            self.logs_frame,
-            font=ctk.CTkFont(family="Consolas", size=11),
-            fg_color=BG_GLASS_INNER,
-            text_color="#7ecbf7",
-            corner_radius=14
-        )
-        self.log_textbox.pack(fill="both", expand=True)
-
-    def _copy_logs_to_clipboard(self):
-        content = self.log_textbox.get("1.0", "end-1c")
-        self.clipboard_clear()
-        self.clipboard_append(content)
-        self.btn_copy_logs.configure(text=self.tr("btn_copied"), fg_color="#155a2e")
-        self.after(1600, lambda: self.btn_copy_logs.configure(text=self.tr("btn_copy_logs"), fg_color=BG_GLASS_INNER))
 
     # ══════════════════════════════════════════════════════════════════════════
     #  Language Switcher
@@ -5072,8 +5028,6 @@ class LunarixLauncherApp(ctk.CTk):
         self.btn_mr_search.configure(text=self.tr("btn_search"))
         self.btn_page_prev.configure(text=self.tr("page_prev"))
         self.btn_page_next.configure(text=self.tr("page_next"))
-        self.btn_copy_logs.configure(text=self.tr("btn_copy_logs"))
-        self.btn_clear_logs.configure(text=self.tr("btn_clear_logs"))
 
         self.lbl_s_lang.configure(text=self.tr("settings_lang"))
         self.lbl_s_gamedir.configure(text=self.tr("settings_gamedir"))
@@ -5106,8 +5060,7 @@ class LunarixLauncherApp(ctk.CTk):
             getattr(self, 'friends_frame', None),
             getattr(self, 'mods_frame', None),
             getattr(self, 'changelog_frame', None),
-            getattr(self, 'settings_frame', None),
-            getattr(self, 'logs_frame', None)
+            getattr(self, 'settings_frame', None)
         ]
         for f in frames:
             if f is not None:
@@ -5177,46 +5130,11 @@ class LunarixLauncherApp(ctk.CTk):
         self._hide_all_tabs()
         self.settings_frame.pack(fill="both", expand=True)
 
-    def _show_logs(self):
-        self._select_tab("logs")
-        self._hide_all_tabs()
-        self.logs_frame.pack(fill="both", expand=True)
-        # Always check and load latest.log if textbox is empty, or offer a reload
-        try:
-            current_text = self.log_textbox.get("1.0", "end-1c").strip()
-            if not current_text:
-                log_candidates = []
-                g_dir = (self.config_data.get("game_dir") or "").strip()
-                if g_dir:
-                    log_candidates.append(os.path.join(g_dir, "logs", "latest.log"))
-                log_candidates.append(os.path.join(os.getcwd(), "logs", "latest.log"))
-                appdata_mc = os.path.join(os.environ.get("APPDATA", ""), ".minecraft")
-                log_candidates.append(os.path.join(appdata_mc, "logs", "latest.log"))
-                log_candidates.append(r"C:\lunarixclient\logs\latest.log")
-
-                for lp in log_candidates:
-                    if os.path.exists(lp) and os.path.getsize(lp) > 0:
-                        with open(lp, "r", encoding="utf-8", errors="replace") as f:
-                            lines = f.readlines()
-                            if lines:
-                                self.log_textbox.insert("end", f"--- [Завантажено з {lp}] ---\n")
-                                self.log_textbox.insert("end", "".join(lines[-2000:]))
-                                self.log_textbox.see("end")
-                                break
-        except Exception:
-            pass
-
     # ══════════════════════════════════════════════════════════════════════════
     #  Actions & Game State (Supabase Protected)
     # ══════════════════════════════════════════════════════════════════════════
     def _log(self, msg):
-        def _append():
-            self.log_textbox.insert("end", msg + "\n")
-            self.log_textbox.see("end")
-        self.after(0, _append)
-
-    def _clear_logs(self):
-        self.log_textbox.delete("1.0", "end")
+        pass
 
     def _on_ram_slider_change(self, val):
         self.ram_val_badge.configure(text=f"{int(val)} GB")

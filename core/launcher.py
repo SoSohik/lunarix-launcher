@@ -513,12 +513,6 @@ def launch_minecraft(cfg, log_cb=None, on_exit_cb=None, on_start_cb=None):
         log("[-] Не знайдено жодної бібліотеки для classpath. Перевстановіть клієнт.")
         return False
 
-    log_file_path = os.path.join(game_dir, "logs", "latest.log")
-    try:
-        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-    except Exception:
-        pass
-
     cmd = [
         java_exe,
         f"-Xmx{ram_gb}G",
@@ -618,11 +612,6 @@ def launch_minecraft(cfg, log_cb=None, on_exit_cb=None, on_start_cb=None):
             proc = subprocess.Popen(
                 cmd,
                 cwd=game_dir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
                 startupinfo=startupinfo
             )
             log(f"[✓] Процес запущено (PID: {proc.pid})")
@@ -631,33 +620,6 @@ def launch_minecraft(cfg, log_cb=None, on_exit_cb=None, on_start_cb=None):
                     on_start_cb(proc)
                 except TypeError:
                     on_start_cb()
-            with open(log_file_path, "a", encoding="utf-8", errors="replace") as log_f:
-                for line in proc.stdout:
-                    line = line.strip()
-                    if line:
-                        log(f"[MC] {line}")
-                        log_f.write(f"[MC] {line}\n")
-                        log_f.flush()
-                    # Detect server connection or singleplayer mode
-                    lower_line = line.lower()
-                    if "connecting to" in lower_line:
-                        # e.g. Connecting to mc.hypixel.net, 25565
-                        parts = line.split("Connecting to", 1)[1].split(",")[0].strip()
-                        current_activity["activity"] = "На сервері"
-                        current_activity["server"] = parts
-                        try:
-                            from core.cloud_configs import update_player_presence
-                            update_player_presence(username=username, status="in_game", activity="На сервері", server=parts)
-                        except Exception:
-                            pass
-                    elif "starting integrated server" in lower_line or "integrated server" in lower_line:
-                        current_activity["activity"] = "Одиночна гра (Singleplayer)"
-                        current_activity["server"] = ""
-                        try:
-                            from core.cloud_configs import update_player_presence
-                            update_player_presence(username=username, status="in_game", activity="Одиночна гра (Singleplayer)", server="")
-                        except Exception:
-                            pass
             proc.wait()
             log(f"[*] Гра завершилась з кодом {proc.returncode}")
         except FileNotFoundError:
