@@ -5181,6 +5181,30 @@ class LunarixLauncherApp(ctk.CTk):
         self._select_tab("logs")
         self._hide_all_tabs()
         self.logs_frame.pack(fill="both", expand=True)
+        # Always check and load latest.log if textbox is empty, or offer a reload
+        try:
+            current_text = self.log_textbox.get("1.0", "end-1c").strip()
+            if not current_text:
+                log_candidates = []
+                g_dir = (self.config_data.get("game_dir") or "").strip()
+                if g_dir:
+                    log_candidates.append(os.path.join(g_dir, "logs", "latest.log"))
+                log_candidates.append(os.path.join(os.getcwd(), "logs", "latest.log"))
+                appdata_mc = os.path.join(os.environ.get("APPDATA", ""), ".minecraft")
+                log_candidates.append(os.path.join(appdata_mc, "logs", "latest.log"))
+                log_candidates.append(r"C:\lunarixclient\logs\latest.log")
+
+                for lp in log_candidates:
+                    if os.path.exists(lp) and os.path.getsize(lp) > 0:
+                        with open(lp, "r", encoding="utf-8", errors="replace") as f:
+                            lines = f.readlines()
+                            if lines:
+                                self.log_textbox.insert("end", f"--- [Завантажено з {lp}] ---\n")
+                                self.log_textbox.insert("end", "".join(lines[-2000:]))
+                                self.log_textbox.see("end")
+                                break
+        except Exception:
+            pass
 
     # ══════════════════════════════════════════════════════════════════════════
     #  Actions & Game State (Supabase Protected)

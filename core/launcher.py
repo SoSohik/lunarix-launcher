@@ -513,6 +513,12 @@ def launch_minecraft(cfg, log_cb=None, on_exit_cb=None, on_start_cb=None):
         log("[-] Не знайдено жодної бібліотеки для classpath. Перевстановіть клієнт.")
         return False
 
+    log_file_path = os.path.join(game_dir, "logs", "latest.log")
+    try:
+        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+    except Exception:
+        pass
+
     cmd = [
         java_exe,
         f"-Xmx{ram_gb}G",
@@ -625,10 +631,13 @@ def launch_minecraft(cfg, log_cb=None, on_exit_cb=None, on_start_cb=None):
                     on_start_cb(proc)
                 except TypeError:
                     on_start_cb()
-            for line in proc.stdout:
-                line = line.strip()
-                if line:
-                    log(f"[MC] {line}")
+            with open(log_file_path, "a", encoding="utf-8", errors="replace") as log_f:
+                for line in proc.stdout:
+                    line = line.strip()
+                    if line:
+                        log(f"[MC] {line}")
+                        log_f.write(f"[MC] {line}\n")
+                        log_f.flush()
                     # Detect server connection or singleplayer mode
                     lower_line = line.lower()
                     if "connecting to" in lower_line:
