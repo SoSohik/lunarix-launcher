@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import json
 import time
@@ -24,6 +24,32 @@ if os.name == 'nt':
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('lunarix.client.launcher.1.21.11')
     except Exception:
         pass
+
+
+def apply_windows_modern_style(window):
+    """Enable Windows 10/11 immersive dark mode and modern window styling."""
+    if os.name == 'nt':
+        try:
+            window.update_idletasks()
+            hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+            if not hwnd:
+                hwnd = window.winfo_id()
+            # DWMWA_USE_IMMERSIVE_DARK_MODE (20 on Win11/Win10 20H1+, 19 on older Win10)
+            DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+            value = ctypes.c_int(2)
+            res = ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_USE_IMMERSIVE_DARK_MODE,
+                ctypes.byref(value),
+                ctypes.sizeof(value)
+            )
+            if res != 0:
+                value19 = ctypes.c_int(1)
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    hwnd, 19, ctypes.byref(value19), ctypes.sizeof(value19)
+                )
+        except Exception:
+            pass
 
 # Paths
 BASE_DIR = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
@@ -128,19 +154,19 @@ from core.local_configs import (
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("dark-blue")
 
-# ─── Glassmorphism Palette ──────────────────────────────────────────────────────
-BG_MAIN         = "#070c18"
-BG_SIDEBAR      = "#060a14"
-BG_GLASS_CARD   = "#0b162c"
-BG_GLASS_INNER  = "#081020"
-BORDER_GLASS    = "#1d3557"
-BORDER_GLOW     = "#38bdf8"
-ACCENT_BLUE     = "#2563eb"
-ACCENT_BLUE_HOVER = "#1d4ed8"
-ACCENT_CYAN     = "#38bdf8"
-TEXT_WHITE      = "#f8fafc"
-TEXT_MUTED      = "#8aa4c8"
-TEXT_BRIGHT     = "#e2e8f0"
+# ─── Next-Gen Fluent Dark Palette ────────────────────────────────────────────────
+BG_MAIN         = "#0b0f19"
+BG_SIDEBAR      = "#070b13"
+BG_GLASS_CARD   = "#111827"
+BG_GLASS_INNER  = "#0d1322"
+BORDER_GLASS    = "#1f293d"
+BORDER_GLOW     = "#2d3748"
+ACCENT_BLUE     = "#3b82f6"
+ACCENT_BLUE_HOVER = "#2563eb"
+ACCENT_CYAN     = "#60a5fa"
+TEXT_WHITE      = "#ffffff"
+TEXT_MUTED      = "#94a3b8"
+TEXT_BRIGHT     = "#f1f5f9"
 
 # Background video in Downloads
 DOWNLOADS_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
@@ -255,10 +281,10 @@ class AltSwitcherWidget(ctk.CTkFrame):
     def __init__(self, parent, initial_username="Player", on_change=None, **kwargs):
         super().__init__(
             parent,
-            fg_color="#081020",
-            corner_radius=16,
+            fg_color="#111827",
+            corner_radius=14,
             border_width=1,
-            border_color="#38bdf8",
+            border_color="#1f293d",
             **kwargs
         )
         self._on_change = on_change
@@ -540,7 +566,7 @@ class LauncherUpdateModal(ctk.CTkFrame):
             fg_color="#070e1c",
             corner_radius=22,
             border_width=2,
-            border_color="#38bdf8",
+            border_color="#1e293b",
             **kwargs
         )
         self.update_info = update_info
@@ -647,6 +673,7 @@ class SupabaseAuthModal(ctk.CTkToplevel):
         self.resizable(False, False)
         self.configure(fg_color="#070e1c")
         self.attributes("-topmost", True)
+        apply_windows_modern_style(self)
 
         self.update_idletasks()
         sw = self.winfo_screenwidth()
@@ -754,7 +781,7 @@ class SupabaseAuthModal(ctk.CTkToplevel):
         self.code_entry = ctk.CTkEntry(
             self.code_container, height=34, font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             placeholder_text="Введіть 6 цифр з пошти",
-            fg_color="#040914", border_color="#38bdf8", corner_radius=10
+            fg_color="#040914", border_color="#1e293b", corner_radius=10
         )
         self.code_entry.pack(fill="x", pady=(0, 6))
 
@@ -1191,6 +1218,7 @@ class LunarixLauncherApp(ctk.CTk):
         self.geometry(f"{win_w}x{win_h}+{x}+{y}")
 
         self._setup_window_icons()
+        apply_windows_modern_style(self)
 
         # Video Background Setup
         self._init_video_background()
@@ -1507,20 +1535,21 @@ class LunarixLauncherApp(ctk.CTk):
         try:
             y = np.linspace(0, 1, h)[:, None]
             x = np.linspace(0, 1, w)[None, :]
-            r = 6 + 6 * y
-            g = 9 + 15 * y
-            b = 19 + 29 * y
+            # Modern deep navy / slate ambient gradient
+            r = 10 + 6 * y
+            g = 14 + 10 * y
+            b = 24 + 18 * y
 
-            dist1 = np.sqrt((x - 0.75)**2 + (y - 0.25)**2)
-            glow1 = np.clip(1.0 - dist1 / 0.6, 0, 1)**2 * 25.0
+            dist1 = np.sqrt((x - 0.8)**2 + (y - 0.2)**2)
+            glow1 = np.clip(1.0 - dist1 / 0.7, 0, 1)**2 * 22.0
 
-            dist2 = np.sqrt((x - 0.2)**2 + (y - 0.85)**2)
-            glow2 = np.clip(1.0 - dist2 / 0.5, 0, 1)**2 * 18.0
+            dist2 = np.sqrt((x - 0.15)**2 + (y - 0.85)**2)
+            glow2 = np.clip(1.0 - dist2 / 0.6, 0, 1)**2 * 16.0
 
             rgb = np.zeros((h, w, 3), dtype=np.uint8)
-            rgb[..., 0] = np.clip(r + glow1 * 0.2, 0, 255).astype(np.uint8)
-            rgb[..., 1] = np.clip(g + glow1 * 0.6 + glow2 * 0.4, 0, 255).astype(np.uint8)
-            rgb[..., 2] = np.clip(b + glow1 * 1.0 + glow2 * 0.8, 0, 255).astype(np.uint8)
+            rgb[..., 0] = np.clip(r + glow1 * 0.15, 0, 255).astype(np.uint8)
+            rgb[..., 1] = np.clip(g + glow1 * 0.45 + glow2 * 0.35, 0, 255).astype(np.uint8)
+            rgb[..., 2] = np.clip(b + glow1 * 0.95 + glow2 * 0.75, 0, 255).astype(np.uint8)
 
             img = Image.fromarray(rgb)
         except Exception:
@@ -1635,14 +1664,14 @@ class LunarixLauncherApp(ctk.CTk):
     #  Layout: Sidebar + Main Content (Glassmorphic)
     # ──────────────────────────────────────────────────────────────────────────
     def _build_layout(self):
-        # 1. Glass Sidebar Panel (left) - Expanded to 260px with pack_propagate(False)
+        # 1. Next-Gen Modern Sidebar (left)
         self.sidebar = ctk.CTkFrame(
             self,
-            width=260,
-            corner_radius=20,
-            fg_color="#070e1c",
+            width=250,
+            corner_radius=18,
+            fg_color="#080c16",
             border_width=1,
-            border_color="#1e3a5f"
+            border_color="#1a2333"
         )
         self.sidebar.pack_propagate(False)
         self.sidebar.place(x=14, y=14, relheight=0.95)
@@ -1714,15 +1743,15 @@ class LunarixLauncherApp(ctk.CTk):
             init_icon = icon_pair["inactive"] if icon_pair else None
             btn = ctk.CTkButton(
                 self.sidebar_nav_scroll,
-                text="  " + self.tr(lang_key),
+                text="   " + self.tr(lang_key),
                 image=init_icon,
                 compound="left",
-                font=ctk.CTkFont(family="Segoe UI", size=13),
+                font=ctk.CTkFont(family="Segoe UI Variable Text", size=13, weight="normal"),
                 fg_color="transparent",
-                text_color=TEXT_MUTED,
-                hover_color="#122544",
+                text_color="#94a3b8",
+                hover_color="#151e2e",
                 anchor="w",
-                height=40,
+                height=42,
                 corner_radius=10,
                 command=cmd
             )
@@ -1735,7 +1764,7 @@ class LunarixLauncherApp(ctk.CTk):
             fg_color="#0b162c",
             corner_radius=14,
             border_width=1,
-            border_color="#1e3a5f"
+            border_color="#1e293b"
         )
         auth_box.pack(side="bottom", fill="x", padx=10, pady=12)
 
@@ -1788,19 +1817,19 @@ class LunarixLauncherApp(ctk.CTk):
             icon_pair = self.tab_icons.get(t_id)
             if t_id == tab_name:
                 btn.configure(
-                    fg_color="#142c54",
-                    text_color="#60a5fa",
+                    fg_color="#1d283a",
+                    text_color="#38bdf8",
                     image=icon_pair["active"] if icon_pair else None,
-                    font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+                    font=ctk.CTkFont(family="Segoe UI Variable Text", size=13, weight="bold"),
                     border_width=1,
-                    border_color="#2563eb"
+                    border_color="#3b82f6"
                 )
             else:
                 btn.configure(
                     fg_color="transparent",
-                    text_color=TEXT_MUTED,
+                    text_color="#94a3b8",
                     image=icon_pair["inactive"] if icon_pair else None,
-                    font=ctk.CTkFont(family="Segoe UI", size=13),
+                    font=ctk.CTkFont(family="Segoe UI Variable Text", size=13),
                     border_width=0
                 )
 
@@ -1813,10 +1842,10 @@ class LunarixLauncherApp(ctk.CTk):
         # ── TOP BAR (Banner Left + Alt Switcher Right) ──────────────────────────
         top_bar = ctk.CTkFrame(
             self.home_frame,
-            fg_color="transparent",
-            corner_radius=20,
+            fg_color="#0e1524",
+            corner_radius=18,
             border_width=1,
-            border_color="#38bdf8"
+            border_color="#1c2738"
         )
         top_bar.pack(fill="x", pady=(0, 14))
 
@@ -1843,7 +1872,7 @@ class LunarixLauncherApp(ctk.CTk):
         h_right = ctk.CTkFrame(t_in, fg_color="transparent")
         h_right.pack(side="right")
 
-        v_badge = ctk.CTkFrame(h_right, fg_color="transparent", corner_radius=10, border_width=1, border_color="#38bdf8")
+        v_badge = ctk.CTkFrame(h_right, fg_color="transparent", corner_radius=10, border_width=1, border_color="#1e293b")
         v_badge.pack(side="right", padx=(10, 0))
         ctk.CTkLabel(
             v_badge, text=f"v{LAUNCHER_VERSION}",
@@ -1861,10 +1890,10 @@ class LunarixLauncherApp(ctk.CTk):
         # ── CENTER ACTION CARD (Glassmorphism Deck) ────────────────────────────
         act_card = ctk.CTkFrame(
             self.home_frame,
-            fg_color="transparent",
-            corner_radius=22,
+            fg_color="#0e1524",
+            corner_radius=20,
             border_width=1,
-            border_color="#38bdf8"
+            border_color="#1c2738"
         )
         act_card.pack(fill="both", expand=True)
 
@@ -1875,12 +1904,14 @@ class LunarixLauncherApp(ctk.CTk):
         self.home_main_btn = ctk.CTkButton(
             center_deck,
             text=self.tr("btn_play"),
-            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
-            fg_color=ACCENT_BLUE,
-            hover_color=ACCENT_BLUE_HOVER,
-            height=58,
-            width=360,
-            corner_radius=14,
+            font=ctk.CTkFont(family="Segoe UI Variable Text", size=17, weight="bold"),
+            fg_color="#2563eb",
+            hover_color="#1d4ed8",
+            height=54,
+            width=340,
+            corner_radius=16,
+            border_width=1,
+            border_color="#3b82f6",
             command=self._on_home_main_btn_click
         )
         self.home_main_btn.pack(pady=(0, 16))
@@ -1932,7 +1963,7 @@ class LunarixLauncherApp(ctk.CTk):
         self.alts_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
 
         # Header banner
-        header = ctk.CTkFrame(self.alts_frame, fg_color="transparent", corner_radius=16, border_width=1, border_color="#1e3a5f")
+        header = ctk.CTkFrame(self.alts_frame, fg_color="transparent", corner_radius=16, border_width=1, border_color="#1e293b")
         header.pack(fill="x", pady=(0, 10))
 
         h_left = ctk.CTkFrame(header, fg_color="transparent")
@@ -2018,7 +2049,7 @@ class LunarixLauncherApp(ctk.CTk):
                 fg_color="#0e1f38" if is_cur else "#0b162c",
                 corner_radius=14,
                 border_width=1,
-                border_color="#38bdf8" if is_cur else "#1e3a5f"
+                border_color="#1e293b" if is_cur else "#1e3a5f"
             )
             card.pack(fill="x", pady=4, padx=4)
 
@@ -2105,7 +2136,7 @@ class LunarixLauncherApp(ctk.CTk):
         ctk.CTkLabel(popup, text="ДОДАТИ НОВИЙ АКАУНТ", font=ctk.CTkFont(family="Segoe UI", size=15, weight="bold"), text_color="#60a5fa").pack(pady=(18, 4))
         ctk.CTkLabel(popup, text="Введіть нікнейм для гри та синхронізації", font=ctk.CTkFont(family="Segoe UI", size=11), text_color=TEXT_MUTED).pack(pady=(0, 12))
 
-        entry = ctk.CTkEntry(popup, height=36, font=ctk.CTkFont(family="Segoe UI", size=12), placeholder_text="Нікнейм гравця", corner_radius=10, fg_color="#040914", border_color="#1e3a5f")
+        entry = ctk.CTkEntry(popup, height=36, font=ctk.CTkFont(family="Segoe UI", size=12), placeholder_text="Нікнейм гравця", corner_radius=10, fg_color="#040914", border_color="#1e293b")
         entry.pack(fill="x", padx=24, pady=(0, 14))
         entry.focus()
 
@@ -2130,7 +2161,7 @@ class LunarixLauncherApp(ctk.CTk):
     def _init_chat_view(self):
         self.chat_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
 
-        top = ctk.CTkFrame(self.chat_frame, fg_color="transparent", corner_radius=16, border_width=1, border_color="#1e3a5f")
+        top = ctk.CTkFrame(self.chat_frame, fg_color="transparent", corner_radius=16, border_width=1, border_color="#1e293b")
         top.pack(fill="x", pady=(0, 10))
 
         t_left = ctk.CTkFrame(top, fg_color="transparent")
@@ -2150,7 +2181,7 @@ class LunarixLauncherApp(ctk.CTk):
             top, text="🔄 Оновити",
             font=ctk.CTkFont(family="Segoe UI", size=12),
             fg_color="#0b162c", hover_color="#162e54", corner_radius=10,
-            border_width=1, border_color="#1e3a5f", width=100, height=34,
+            border_width=1, border_color="#1e293b", width=100, height=34,
             command=self._load_chat_view
         )
         btn_refresh.pack(side="right", padx=16, pady=10)
@@ -2158,13 +2189,13 @@ class LunarixLauncherApp(ctk.CTk):
         self.chat_scroll = ctk.CTkScrollableFrame(self.chat_frame, fg_color="transparent")
         self.chat_scroll.pack(fill="both", expand=True, pady=(0, 10))
 
-        bar = ctk.CTkFrame(self.chat_frame, fg_color="#0b162c", corner_radius=14, border_width=1, border_color="#1e3a5f")
+        bar = ctk.CTkFrame(self.chat_frame, fg_color="#0b162c", corner_radius=14, border_width=1, border_color="#1e293b")
         bar.pack(fill="x", pady=(0, 2))
 
         self.chat_entry = ctk.CTkEntry(
             bar, height=40, font=ctk.CTkFont(family="Segoe UI", size=12),
             placeholder_text="Напишіть повідомлення в глобальний чат... (Enter для надсилання)",
-            fg_color="#040914", border_color="#1e3a5f", corner_radius=10
+            fg_color="#040914", border_color="#1e293b", corner_radius=10
         )
         self.chat_entry.pack(side="left", fill="x", expand=True, padx=(10, 8), pady=8)
         self.chat_entry.bind("<Return>", lambda e: self._on_send_chat_message())
@@ -2283,7 +2314,7 @@ class LunarixLauncherApp(ctk.CTk):
 
         self.mods_locked_card = ctk.CTkFrame(
             self.mods_frame, fg_color="transparent",
-            corner_radius=20, border_width=1, border_color="#38bdf8"
+            corner_radius=20, border_width=1, border_color="#1e293b"
         )
         l_in = ctk.CTkFrame(self.mods_locked_card, fg_color="transparent")
         l_in.pack(expand=True, padx=30, pady=40)
@@ -2462,7 +2493,7 @@ class LunarixLauncherApp(ctk.CTk):
         self.configs_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
 
         # Top Control Bar (Search by code + Publish)
-        bar = ctk.CTkFrame(self.configs_frame, fg_color="transparent", corner_radius=16, border_width=1, border_color="#38bdf8")
+        bar = ctk.CTkFrame(self.configs_frame, fg_color="transparent", corner_radius=16, border_width=1, border_color="#1e293b")
         bar.pack(fill="x", pady=(0, 10))
 
         bar_inner = ctk.CTkFrame(bar, fg_color="transparent")
@@ -2535,7 +2566,7 @@ class LunarixLauncherApp(ctk.CTk):
             c_dls = item.get("downloads", 0)
             content = item.get("content", {})
 
-            card = ctk.CTkFrame(self.configs_scroll, fg_color="transparent", corner_radius=14, border_width=1, border_color="#38bdf8")
+            card = ctk.CTkFrame(self.configs_scroll, fg_color="transparent", corner_radius=14, border_width=1, border_color="#1e293b")
             card.pack(fill="x", padx=4, pady=5)
 
             top = ctk.CTkFrame(card, fg_color="transparent")
@@ -2732,7 +2763,7 @@ class LunarixLauncherApp(ctk.CTk):
 
         # Top Control Bar
         bar = ctk.CTkFrame(self.localcfg_frame, fg_color="transparent", corner_radius=16,
-                           border_width=1, border_color="#38bdf8")
+                           border_width=1, border_color="#1e293b")
         bar.pack(fill="x", pady=(0, 10))
 
         bar_inner = ctk.CTkFrame(bar, fg_color="transparent")
@@ -2797,7 +2828,7 @@ class LunarixLauncherApp(ctk.CTk):
             mtime = time.strftime("%d.%m.%Y %H:%M", time.localtime(item["mtime"]))
 
             card = ctk.CTkFrame(self.localcfg_scroll, fg_color="transparent",
-                                corner_radius=14, border_width=1, border_color="#38bdf8")
+                                corner_radius=14, border_width=1, border_color="#1e293b")
             card.pack(fill="x", padx=4, pady=5)
 
             top = ctk.CTkFrame(card, fg_color="transparent")
@@ -2984,7 +3015,7 @@ class LunarixLauncherApp(ctk.CTk):
         self.resourcepacks_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
 
         # Top Control Bar (Search & Catalog Selector)
-        top_bar = ctk.CTkFrame(self.resourcepacks_frame, fg_color="transparent", corner_radius=16, border_width=1, border_color="#38bdf8")
+        top_bar = ctk.CTkFrame(self.resourcepacks_frame, fg_color="transparent", corner_radius=16, border_width=1, border_color="#1e293b")
         top_bar.pack(fill="x", pady=(0, 10))
 
         bar_in = ctk.CTkFrame(top_bar, fg_color="transparent")
@@ -3192,7 +3223,7 @@ class LunarixLauncherApp(ctk.CTk):
             packs = [p for p in packs if search in p.get("name", "").lower() or search in p.get("author", "").lower()]
 
         if not packs:
-            card = ctk.CTkFrame(self.rp_comm_scroll, fg_color="transparent", corner_radius=14, border_width=1, border_color="#38bdf8")
+            card = ctk.CTkFrame(self.rp_comm_scroll, fg_color="transparent", corner_radius=14, border_width=1, border_color="#1e293b")
             card.pack(fill="x", padx=4, pady=10)
             msg = "У каталозі спільноти ще немає ресурспаків.\nНатисніть '☁ Залити свій ресурспак' вище, щоб стати першим!"
             if search:
@@ -3554,7 +3585,7 @@ class LunarixLauncherApp(ctk.CTk):
         self._friends_active_subtab = "cloud"  # "cloud", "local", "requests", "users"
 
         # 1. Top Header Bar
-        top_bar = ctk.CTkFrame(self.friends_frame, fg_color="transparent", corner_radius=16, border_width=1, border_color="#38bdf8")
+        top_bar = ctk.CTkFrame(self.friends_frame, fg_color="transparent", corner_radius=16, border_width=1, border_color="#1e293b")
         top_bar.pack(fill="x", pady=(0, 8))
 
         bar_in = ctk.CTkFrame(top_bar, fg_color="transparent")
@@ -3773,7 +3804,7 @@ class LunarixLauncherApp(ctk.CTk):
         ).pack(side="left")
 
         if not cloud_friends:
-            card = ctk.CTkFrame(self.friends_scroll, fg_color="transparent", corner_radius=16, border_width=1, border_color="#38bdf8")
+            card = ctk.CTkFrame(self.friends_scroll, fg_color="transparent", corner_radius=16, border_width=1, border_color="#1e293b")
             card.pack(fill="x", padx=4, pady=10)
             msg = "У вас ще немає підтверджених друзів у софті.\nПерейдіть у вкладку '🌐 Усі користувачі', щоб надіслати запит!"
             if search:
@@ -3787,7 +3818,7 @@ class LunarixLauncherApp(ctk.CTk):
         presence_map = self._friends_data.get("presence", {})
 
         for fname in cloud_friends:
-            card = ctk.CTkFrame(self.friends_scroll, fg_color="transparent", corner_radius=14, border_width=1, border_color="#38bdf8")
+            card = ctk.CTkFrame(self.friends_scroll, fg_color="transparent", corner_radius=14, border_width=1, border_color="#1e293b")
             card.pack(fill="x", padx=4, pady=4)
 
             inner = ctk.CTkFrame(card, fg_color="transparent")
@@ -3879,7 +3910,7 @@ class LunarixLauncherApp(ctk.CTk):
         ).pack(side="right")
 
         if not local_friends:
-            card = ctk.CTkFrame(self.friends_scroll, fg_color="transparent", corner_radius=16, border_width=1, border_color="#38bdf8")
+            card = ctk.CTkFrame(self.friends_scroll, fg_color="transparent", corner_radius=16, border_width=1, border_color="#1e293b")
             card.pack(fill="x", padx=4, pady=10)
             msg = "У файлі friends.json немає збережених нікнеймів.\nВведіть нікнейм вище, щоб додати гравця в ігрові друзі!"
             if search:
@@ -4103,7 +4134,7 @@ class LunarixLauncherApp(ctk.CTk):
         ).pack(side="left")
 
         if not other_users:
-            card = ctk.CTkFrame(self.friends_scroll, fg_color="transparent", corner_radius=16, border_width=1, border_color="#38bdf8")
+            card = ctk.CTkFrame(self.friends_scroll, fg_color="transparent", corner_radius=16, border_width=1, border_color="#1e293b")
             card.pack(fill="x", padx=4, pady=10)
             ctk.CTkLabel(
                 card, text="Користувачів не знайдено.",
@@ -4279,7 +4310,7 @@ class LunarixLauncherApp(ctk.CTk):
     def _init_changelog_view(self):
         self.changelog_frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
 
-        top_bar = ctk.CTkFrame(self.changelog_frame, fg_color="transparent", corner_radius=16, border_width=1, border_color="#38bdf8")
+        top_bar = ctk.CTkFrame(self.changelog_frame, fg_color="transparent", corner_radius=16, border_width=1, border_color="#1e293b")
         top_bar.pack(fill="x", pady=(0, 10))
 
         t_in = ctk.CTkFrame(top_bar, fg_color="transparent")
@@ -4356,7 +4387,7 @@ class LunarixLauncherApp(ctk.CTk):
         ]
 
         for entry in changelogs:
-            card = ctk.CTkFrame(scroll, fg_color="transparent", corner_radius=16, border_width=1, border_color="#38bdf8")
+            card = ctk.CTkFrame(scroll, fg_color="transparent", corner_radius=16, border_width=1, border_color="#1e293b")
             card.pack(fill="x", padx=4, pady=6)
 
             ch_top = ctk.CTkFrame(card, fg_color="transparent")
@@ -4486,7 +4517,7 @@ class LunarixLauncherApp(ctk.CTk):
         # ── ACCOUNT ADMIN & SECURITY CARD ────────────────────────────────────
         sec_card = ctk.CTkFrame(
             scroll, fg_color="#0b162c",
-            corner_radius=18, border_width=1, border_color="#1e3a5f"
+            corner_radius=18, border_width=1, border_color="#1e293b"
         )
         sec_card.pack(fill="x", pady=6)
 
@@ -4564,7 +4595,7 @@ class LunarixLauncherApp(ctk.CTk):
         ctk.CTkLabel(f, text="Новий пароль (від 4 символів)", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold")).pack(anchor="w", pady=(0, 2))
         p1_row = ctk.CTkFrame(f, fg_color="transparent")
         p1_row.pack(fill="x", pady=(0, 8))
-        p1 = ctk.CTkEntry(p1_row, height=34, show="•", font=ctk.CTkFont(family="Segoe UI", size=12), placeholder_text="Введіть новий пароль", corner_radius=10, fg_color="#040914", border_color="#1e3a5f")
+        p1 = ctk.CTkEntry(p1_row, height=34, show="•", font=ctk.CTkFont(family="Segoe UI", size=12), placeholder_text="Введіть новий пароль", corner_radius=10, fg_color="#040914", border_color="#1e293b")
         p1.pack(side="left", fill="x", expand=True, padx=(0, 6))
 
         eye_btn1 = ctk.CTkButton(p1_row, text="👁", width=34, height=34, fg_color="#142c54", hover_color="#1e4078", corner_radius=8,
@@ -4572,7 +4603,7 @@ class LunarixLauncherApp(ctk.CTk):
         eye_btn1.pack(side="right")
 
         ctk.CTkLabel(f, text="Повторіть новий пароль", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold")).pack(anchor="w", pady=(0, 2))
-        p2 = ctk.CTkEntry(f, height=34, show="•", font=ctk.CTkFont(family="Segoe UI", size=12), placeholder_text="Повторіть новий пароль", corner_radius=10, fg_color="#040914", border_color="#1e3a5f")
+        p2 = ctk.CTkEntry(f, height=34, show="•", font=ctk.CTkFont(family="Segoe UI", size=12), placeholder_text="Повторіть новий пароль", corner_radius=10, fg_color="#040914", border_color="#1e293b")
         p2.pack(fill="x", pady=(0, 14))
 
         def _do_change():
@@ -4618,11 +4649,11 @@ class LunarixLauncherApp(ctk.CTk):
         f.pack(fill="x", padx=24)
 
         ctk.CTkLabel(f, text="Бажаний новий юзернейм", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold")).pack(anchor="w", pady=(0, 2))
-        new_entry = ctk.CTkEntry(f, height=34, font=ctk.CTkFont(family="Segoe UI", size=12), placeholder_text="Новий нікнейм (від 3 символів)", corner_radius=10, fg_color="#040914", border_color="#1e3a5f")
+        new_entry = ctk.CTkEntry(f, height=34, font=ctk.CTkFont(family="Segoe UI", size=12), placeholder_text="Новий нікнейм (від 3 символів)", corner_radius=10, fg_color="#040914", border_color="#1e293b")
         new_entry.pack(fill="x", pady=(0, 8))
 
         ctk.CTkLabel(f, text="Причина зміни (для адміна)", font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold")).pack(anchor="w", pady=(0, 2))
-        reason_entry = ctk.CTkEntry(f, height=34, font=ctk.CTkFont(family="Segoe UI", size=12), placeholder_text="Чому бажаєте змінити нікнейм", corner_radius=10, fg_color="#040914", border_color="#1e3a5f")
+        reason_entry = ctk.CTkEntry(f, height=34, font=ctk.CTkFont(family="Segoe UI", size=12), placeholder_text="Чому бажаєте змінити нікнейм", corner_radius=10, fg_color="#040914", border_color="#1e293b")
         reason_entry.pack(fill="x", pady=(0, 14))
 
         def _submit():
@@ -4799,7 +4830,7 @@ class LunarixLauncherApp(ctk.CTk):
         def glass_card(parent):
             return ctk.CTkFrame(
                 parent, fg_color="transparent",
-                corner_radius=18, border_width=1, border_color="#38bdf8"
+                corner_radius=18, border_width=1, border_color="#1e293b"
             )
 
         card_lang = glass_card(scroll)
