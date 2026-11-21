@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('assets', 'assets'), ('core', 'core')]
+datas = [('assets', 'assets'), ('core', 'core'), ('C:/Users/Адмін/AppData/Local/Programs/Python/Python312/tcl/tcl8.6', '_tcl_data'), ('C:/Users/Адмін/AppData/Local/Programs/Python/Python312/tcl/tk8.6', '_tk_data')]
 binaries = []
 hiddenimports = ['PIL._tkinter_finder', 'PIL.ImageTk', 'PIL.ImageDraw']
 tmp_ret = collect_all('customtkinter')

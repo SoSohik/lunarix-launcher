@@ -16,6 +16,8 @@ cmd = [
     "--noupx",
     "--add-data", f"assets{os.pathsep}assets",
     "--add-data", f"core{os.pathsep}core",
+    "--add-data", f"{os.path.join(sys.base_prefix, 'tcl', 'tcl8.6')}{os.pathsep}_tcl_data",
+    "--add-data", f"{os.path.join(sys.base_prefix, 'tcl', 'tk8.6')}{os.pathsep}_tk_data",
     "--collect-all", "customtkinter",
     "--collect-all", "cv2",
     "--hidden-import", "PIL._tkinter_finder",

@@ -1,5 +1,30 @@
 import os
 import sys
+
+# Ensure Tcl/Tk can locate init.tcl when packaged with PyInstaller or running standalone
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    base_mei = sys._MEIPASS
+    candidates_tcl = [
+        os.path.join(base_mei, "_tcl_data"),
+        os.path.join(base_mei, "tcl", "tcl8.6"),
+        os.path.join(base_mei, "tcl8.6"),
+        os.path.join(base_mei, "tcl"),
+    ]
+    for p in candidates_tcl:
+        if os.path.exists(os.path.join(p, "init.tcl")):
+            os.environ["TCL_LIBRARY"] = p
+            break
+
+    candidates_tk = [
+        os.path.join(base_mei, "_tk_data"),
+        os.path.join(base_mei, "tcl", "tk8.6"),
+        os.path.join(base_mei, "tk8.6"),
+        os.path.join(base_mei, "tk"),
+    ]
+    for p in candidates_tk:
+        if os.path.exists(p):
+            os.environ["TK_LIBRARY"] = p
+            break
 import json
 import time
 import threading
