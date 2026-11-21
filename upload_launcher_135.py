@@ -11,7 +11,7 @@ TOKEN = ""
 OWNER = "SoSohik"
 REPO = "lunarix-client"
 RELEASE_ID = 445467632
-VERSION = "1.3.4"
+VERSION = "1.3.5"
 EXE_PATH = "Lunarix Launcher.exe"
 UPLOAD_NAME = "Lunarix.Launcher.exe"
 COMMIT_MSG = f"Update launcher to v{VERSION}"
@@ -37,7 +37,7 @@ print(f"File: {EXE_PATH}  Size: {file_size}  SHA1: {file_sha1}")
 assets_url = f"https://api.github.com/repos/{OWNER}/{REPO}/releases/{RELEASE_ID}/assets"
 req = urllib.request.Request(assets_url, headers=headers)
 with urllib.request.urlopen(req, timeout=60) as resp:
-    assets = json.loads(resp.read().decode("utf-8"))
+    assets = json.loads(resp.read().decode("utf-8-sig"))
 
 for a in assets:
     if a.get("name") in (UPLOAD_NAME, "Lunarix Launcher.exe"):
@@ -68,7 +68,7 @@ upload_headers = {
 }
 up_req = urllib.request.Request(upload_url, data=raw_data, headers=upload_headers, method="POST")
 with urllib.request.urlopen(up_req, timeout=1800) as up_resp:
-    new_asset = json.loads(up_resp.read().decode("utf-8"))
+    new_asset = json.loads(up_resp.read().decode("utf-8-sig"))
 
 new_asset_url = new_asset.get("url")
 print(f"SUCCESS: asset ID {new_asset.get('id')} size {new_asset.get('size')} -> {new_asset_url}")
@@ -77,9 +77,9 @@ print(f"SUCCESS: asset ID {new_asset.get('id')} size {new_asset.get('size')} -> 
 manifest_url = f"https://api.github.com/repos/{OWNER}/{REPO}/contents/manifest.json"
 req_m = urllib.request.Request(manifest_url, headers=headers)
 with urllib.request.urlopen(req_m, timeout=60) as resp_m:
-    m_info = json.loads(resp_m.read().decode("utf-8"))
+    m_info = json.loads(resp_m.read().decode("utf-8-sig"))
     m_sha = m_info.get("sha")
-    manifest = json.loads(base64.b64decode(m_info.get("content")).decode("utf-8"))
+    manifest = json.loads(base64.b64decode(m_info.get("content")).decode("utf-8-sig"))
 
 manifest["launcher"] = {
     "version": VERSION,
@@ -101,7 +101,7 @@ commit_headers = dict(headers)
 commit_headers["Content-Type"] = "application/json"
 commit_req = urllib.request.Request(manifest_url, data=payload, headers=commit_headers, method="PUT")
 with urllib.request.urlopen(commit_req, timeout=60) as c_resp:
-    res = json.loads(c_resp.read().decode("utf-8"))
+    res = json.loads(c_resp.read().decode("utf-8-sig"))
     print("SUCCESS: manifest.json updated, commit:", res.get("commit", {}).get("sha"))
 
 print("ALL DONE! Launcher v%s is live." % VERSION)
