@@ -103,7 +103,7 @@ def sync_client_files(target_dir=None, token=None, sync_to_appdata=True):
 
     if os.path.exists(local_manifest):
         try:
-            with open(local_manifest, "r", encoding="utf-8") as f:
+            with open(local_manifest, "r", encoding="utf-8-sig") as f:
                 manifest_data = json.load(f)
         except Exception:
             manifest_data = None

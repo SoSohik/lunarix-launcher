@@ -1304,7 +1304,13 @@ class LunarixLauncherApp(ctk.CTk):
             g_dir = self.config_data.get("game_dir", "")
             has_update, update_info = check_client_update(g_dir)
             if has_update and update_info:
-                self.after(1000, lambda: self._show_client_update_modal(update_info))
+                self.has_client_update = True
+                self.client_update_info = update_info
+                self.after(0, self._refresh_game_state)
+            else:
+                self.has_client_update = False
+                self.client_update_info = None
+                self.after(0, self._refresh_game_state)
         except Exception as e:
             print(f"[Client Update BG] Error: {e}")
 
@@ -5272,13 +5278,24 @@ class LunarixLauncherApp(ctk.CTk):
 
         if installed:
             if not self.is_busy:
-                self.home_main_btn.configure(
-                    state="normal",
-                    text=self.tr("btn_play"),
-                    fg_color=ACCENT_BLUE,
-                    hover_color=ACCENT_BLUE_HOVER
-                )
-                self._update_progress(0, "")
+                if getattr(self, "has_client_update", False):
+                    self.home_main_btn.configure(
+                        state="normal",
+                        text=self.tr("btn_update_client"),
+                        fg_color="#0284c7",
+                        hover_color="#0369a1"
+                    )
+                    ver = (self.client_update_info or {}).get("version", "")
+                    status_text = f"Доступне оновлення клієнта ({ver})!" if ver else "Доступне оновлення клієнта!"
+                    self._update_progress(0, status_text)
+                else:
+                    self.home_main_btn.configure(
+                        state="normal",
+                        text=self.tr("btn_play"),
+                        fg_color=ACCENT_BLUE,
+                        hover_color=ACCENT_BLUE_HOVER
+                    )
+                    self._update_progress(0, "")
 
             self.mods_locked_card.pack_forget()
             self.mods_unlocked_container.pack(fill="both", expand=True)
@@ -5621,6 +5638,8 @@ class LunarixLauncherApp(ctk.CTk):
         installed = is_game_installed(g_dir)
         if not installed:
             self._start_download_flow()
+        elif getattr(self, "has_client_update", False):
+            self._start_client_update_flow()
         else:
             self._start_launch_flow()
 
@@ -5636,6 +5655,28 @@ class LunarixLauncherApp(ctk.CTk):
                 self.after(0, lambda: messagebox.showinfo("Готово", self.tr("download_done")))
             except Exception as e:
                 self._log(f"[-] Помилка завантаження: {e}")
+                self.after(0, lambda: messagebox.showerror("Помилка", f"{e}"))
+            finally:
+                self.is_busy = False
+                self.after(0, lambda: self._update_progress(0, ""))
+                self.after(0, self._refresh_game_state)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _start_client_update_flow(self):
+        self.is_busy = True
+        self.home_main_btn.configure(state="disabled", text=self.tr("btn_downloading"))
+
+        def worker():
+            try:
+                g_dir = self.config_data.get("game_dir", "")
+                self._log("[*] Початок оновлення клієнта...")
+                install_or_update_game(g_dir, progress_cb=self._update_progress, log_cb=self._log)
+                self.has_client_update = False
+                self.client_update_info = None
+                self.after(0, lambda: messagebox.showinfo("Готово", "Клієнт успішно оновлено!"))
+            except Exception as e:
+                self._log(f"[-] Помилка оновлення клієнта: {e}")
                 self.after(0, lambda: messagebox.showerror("Помилка", f"{e}"))
             finally:
                 self.is_busy = False
@@ -5667,9 +5708,6 @@ class LunarixLauncherApp(ctk.CTk):
         def worker():
             try:
                 g_dir = self.config_data.get("game_dir", "")
-                self._update_progress(0.3, "Перевірка файлів...")
-                install_or_update_game(g_dir, progress_cb=self._update_progress, log_cb=self._log)
-
                 self._update_progress(0.9, "Запуск клієнта...")
                 self._log("[*] Запуск гри...")
                 started = launch_minecraft(

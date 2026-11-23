@@ -225,9 +225,30 @@ def install_or_update_game(game_dir, progress_cb=None, log_cb=None):
             log(f"[*] Завантаження {VERSION_NAME}.jar з GitHub...")
             download_github_asset(v_jar_asset["url"], v_jar_target, progress_cb=progress_cb, expected_size=v_jar_asset.get("size", 0))
         else:
-            local_jar = os.path.join(appdata_mc, "versions", f"Fabric {MC_VERSION}", f"Fabric {MC_VERSION}.jar")
-            if os.path.exists(local_jar):
-                shutil.copy2(local_jar, v_jar_target)
+            # Version jar — це vanilla client.jar Mojang. URL/sha1/size лежать
+            # у downloads.client усередині version json — качаємо напряму,
+            # без залежності від локального .minecraft.
+            vj_client = {}
+            try:
+                with open(v_json_target, "r", encoding="utf-8-sig") as vf:
+                    vj_client = (json.load(vf).get("downloads") or {}).get("client") or {}
+            except Exception:
+                vj_client = {}
+            if vj_client.get("url"):
+                log(f"[*] Завантаження {VERSION_NAME}.jar (vanilla client) з Mojang...")
+                download_github_asset(vj_client["url"], v_jar_target, progress_cb=progress_cb,
+                                      expected_size=vj_client.get("size", 0))
+                expected_sha1 = (vj_client.get("sha1") or "").lower()
+                if expected_sha1 and get_sha1(v_jar_target) != expected_sha1:
+                    try:
+                        os.remove(v_jar_target)
+                    except Exception:
+                        pass
+                    raise RuntimeError(f"SHA1 mismatch для {VERSION_NAME}.jar")
+            else:
+                local_jar = os.path.join(appdata_mc, "versions", f"Fabric {MC_VERSION}", f"Fabric {MC_VERSION}.jar")
+                if os.path.exists(local_jar):
+                    shutil.copy2(local_jar, v_jar_target)
 
     # 4. Natives
     natives_target = os.path.join(versions_dir, "natives")
@@ -337,6 +358,13 @@ def install_or_update_game(game_dir, progress_cb=None, log_cb=None):
             else:
                 install_mod_from_modrinth("sodium", mods_dir, progress_cb=progress_cb, game_version=MC_VERSION)
 
+    # 7.5. Ігрові assets (текстури/звуки) — ~450 МБ, без них гра без текстур
+    try:
+        ensure_game_assets(v_json_target, os.path.join(appdata_mc, "assets"),
+                           progress_cb=progress_cb, log_cb=log)
+    except Exception as e:
+        log(f"[!] Помилка завантаження assets: {e}")
+
     if progress_cb:
         progress_cb(1.0, "Останній реліз готовий до запуску!")
     if libs_ok:
@@ -346,7 +374,164 @@ def install_or_update_game(game_dir, progress_cb=None, log_cb=None):
             "гра може не запуститися. Перевірте інтернет або перевстановіть клієнт.")
     return libs_ok
 
-LAUNCHER_VERSION = "1.3.5"
+
+def ensure_game_assets(version_json_path, assets_root, progress_cb=None, log_cb=None):
+    """
+    Докачує ігрові assets (індекс + об'єкти) у assets_root — та сама структура,
+    що й у .minecraft/assets. Без цього на чистій машині гра запускається
+    без текстур/звуків. Повертає True, якщо всі об'єкти на місці.
+    """
+    def log(msg):
+        if log_cb:
+            log_cb(msg)
+        print(msg)
+
+    if not version_json_path or not os.path.exists(version_json_path):
+        return False
+    if not assets_root:
+        return False
+
+    try:
+        with open(version_json_path, "rb") as f:
+            raw = f.read()
+        if raw.startswith(b"\xef\xbb\xbf"):
+            raw = raw[3:]
+        vdata = json.loads(raw.decode("utf-8", errors="replace"))
+    except Exception as e:
+        log(f"[!] Помилка читання version json для assets: {e}")
+        return False
+
+    ai = vdata.get("assetIndex") or {}
+    if isinstance(ai, str):
+        ai = {"id": ai}
+    index_id = str(ai.get("id") or vdata.get("assets") or "")
+    index_url = ai.get("url")
+    if not index_id or not index_url:
+        log("[!] У version json немає assetIndex — assets пропущено")
+        return False
+
+    indexes_dir = os.path.join(assets_root, "indexes")
+    objects_dir = os.path.join(assets_root, "objects")
+    os.makedirs(indexes_dir, exist_ok=True)
+    os.makedirs(objects_dir, exist_ok=True)
+
+    index_path = os.path.join(indexes_dir, f"{index_id}.json")
+    need_index = (not os.path.exists(index_path)) or (
+        ai.get("size") and os.path.getsize(index_path) != int(ai["size"])
+    )
+    if need_index:
+        log(f"[*] Завантаження asset index {index_id}...")
+        _download_file(index_url, index_path)
+        expected = (ai.get("sha1") or "").lower()
+        if expected and get_sha1(index_path) != expected:
+            try:
+                os.remove(index_path)
+            except Exception:
+                pass
+            raise RuntimeError(f"SHA1 mismatch для asset index {index_id}")
+
+    try:
+        with open(index_path, "rb") as f:
+            raw = f.read()
+        if raw.startswith(b"\xef\xbb\xbf"):
+            raw = raw[3:]
+        index_data = json.loads(raw.decode("utf-8", errors="replace"))
+    except Exception as e:
+        log(f"[!] Помилка читання asset index: {e}")
+        return False
+
+    objects = index_data.get("objects") or {}
+    if not objects:
+        return True
+
+    base_url = "https://resources.download.minecraft.net"
+    items = []
+    for _name, meta in objects.items():
+        if not isinstance(meta, dict):
+            continue
+        h = (meta.get("hash") or "").lower()
+        size = int(meta.get("size") or 0)
+        if not h:
+            continue
+        target = os.path.join(objects_dir, h[:2], h)
+        if os.path.exists(target) and (not size or os.path.getsize(target) == size):
+            continue
+        items.append((h, size, target))
+
+    if not items:
+        log("[✓] Ігрові assets вже на місці")
+        return True
+
+    total = len(items)
+    total_mb = int(ai.get("totalSize") or 0) // (1024 * 1024)
+    log(f"[*] Assets: потрібно завантажити {total} файлів (~{total_mb} MB)...")
+
+    done = [0]
+    failed = []
+
+    def _fetch(item):
+        h, size, target = item
+        url = f"{base_url}/{h[:2]}/{h}"
+        try:
+            _download_file(url, target, expected_size=size)
+            return True
+        except Exception:
+            return False
+
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for ok in pool.map(_fetch, items):
+            done[0] += 1
+            if progress_cb:
+                pct = done[0] / total
+                progress_cb(0.85 + pct * 0.13, f"Assets: {done[0]}/{total} файлів")
+            if not ok:
+                failed.append(done[0])
+
+    if failed:
+        log(f"[!] Не вдалося завантажити {len(failed)} asset-файлів")
+        return False
+    log(f"[✓] Assets завантажено ({total} файлів)")
+    return True
+
+
+def _download_file(url, target_path, progress_cb=None, expected_size=0, timeout=60):
+    """Універсальне завантаження файлу (Mojang/CDN тощо) з .download temp-файлом."""
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    temp_target = target_path + ".download"
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp, open(temp_target, "wb") as out_file:
+            total_size = int(resp.headers.get("Content-Length", expected_size))
+            downloaded = 0
+            block_size = 262144
+            while True:
+                chunk = resp.read(block_size)
+                if not chunk:
+                    break
+                out_file.write(chunk)
+                downloaded += len(chunk)
+                if progress_cb and total_size > 0:
+                    pct = min(1.0, downloaded / total_size)
+                    progress_cb(pct, f"Завантаження {os.path.basename(target_path)}: {downloaded // (1024*1024)}MB / {total_size // (1024*1024)}MB")
+        if expected_size and os.path.getsize(temp_target) != int(expected_size):
+            raise IOError(f"Size mismatch: {os.path.getsize(temp_target)} != {expected_size}")
+        if os.path.exists(target_path):
+            try:
+                os.remove(target_path)
+            except Exception:
+                pass
+        shutil.move(temp_target, target_path)
+        return True
+    except Exception:
+        if os.path.exists(temp_target):
+            try:
+                os.remove(temp_target)
+            except Exception:
+                pass
+        raise
+
+LAUNCHER_VERSION = "1.3.7"
 
 def is_newer_version(remote, current):
     """Перевіряє, чи віддалена версія новіша за поточну."""
