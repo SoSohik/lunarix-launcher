@@ -549,7 +549,7 @@ def _download_file(url, target_path, progress_cb=None, expected_size=0, timeout=
                 pass
         raise
 
-LAUNCHER_VERSION = "1.3.8"
+LAUNCHER_VERSION = "1.3.9"
 
 def is_newer_version(remote, current):
     """Перевіряє, чи віддалена версія новіша за поточну."""
