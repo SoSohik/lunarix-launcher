@@ -333,13 +333,31 @@ def install_or_update_game(game_dir, progress_cb=None, log_cb=None):
     fapi_asset = assets_by_name.get(FABRIC_API_JAR)
     need_fapi = not os.path.exists(fapi_target) or (fapi_asset and os.path.getsize(fapi_target) != fapi_asset.get("size", 0))
     if need_fapi:
+        fapi_done = False
         if fapi_asset:
             log("[*] Завантаження Fabric API з GitHub релізу...")
             download_github_asset(fapi_asset["url"], fapi_target, progress_cb=progress_cb, expected_size=fapi_asset.get("size", 0))
+            fapi_done = True
         else:
+            # Fabric API публікується на Maven — тягнемо напряму, без релізу
+            fapi_maven = ("https://maven.fabricmc.net/net/fabricmc/fabric-api/"
+                          "fabric-api/0.141.6+1.21.11/" + FABRIC_API_JAR)
+            try:
+                log("[*] Завантаження Fabric API з Fabric Maven...")
+                _download_file(fapi_maven, fapi_target, expected_size=2426039)
+                fapi_done = True
+            except Exception as e:
+                log(f"[!] Maven Fabric API: {e}")
+        if not fapi_done:
             local_fapi = os.path.join(appdata_mc, "mods", FABRIC_API_JAR)
             if os.path.exists(local_fapi):
                 shutil.copy2(local_fapi, fapi_target)
+                fapi_done = True
+        if not fapi_done:
+            try:
+                install_mod_from_modrinth("fabric-api", mods_dir, progress_cb=progress_cb, game_version=MC_VERSION)
+            except Exception as e:
+                log(f"[!] Не вдалося встановити Fabric API: {e}")
 
     # 7. Sodium (GitHub Release або Modrinth)
     if progress_cb:
@@ -531,7 +549,7 @@ def _download_file(url, target_path, progress_cb=None, expected_size=0, timeout=
                 pass
         raise
 
-LAUNCHER_VERSION = "1.3.7"
+LAUNCHER_VERSION = "1.3.8"
 
 def is_newer_version(remote, current):
     """Перевіряє, чи віддалена версія новіша за поточну."""
@@ -726,6 +744,16 @@ def apply_launcher_update(update_info, progress_cb=None):
         _ulog("FAILED: downloaded update file is missing")
         raise RuntimeError("Файл оновлення не знайдено після завантаження.")
 
+    # Перевіряємо, що завантажене — справжній exe (MZ), а не JSON/HTML помилка
+    try:
+        with open(new_exe, "rb") as _f:
+            if _f.read(2) != b"MZ":
+                _ulog("FAILED: downloaded file is not a valid exe")
+                raise RuntimeError("Завантажений файл пошкоджений — оновлення скасовано.")
+    except OSError as e:
+        _ulog(f"FAILED: cannot verify new exe: {e}")
+        raise RuntimeError(f"Не вдалося перевірити файл оновлення: {e}")
+
     # 1. Відсуваємо старий exe в .old (з повторними спробами)
     if os.path.exists(target_exe):
         try:
@@ -762,6 +790,17 @@ def apply_launcher_update(update_info, progress_cb=None):
         raise RuntimeError(f"Не вдалося встановити оновлення: {e}")
 
     _ulog("update applied, launching new exe")
+
+    # Якщо юзер запускав exe з іншою назвою (напр. Lunarix.Launcher.exe),
+    # синхронізуємо канонічну назву, щоб ярлики вели на нову версію.
+    canonical_exe = os.path.join(exe_dir, "Lunarix Launcher.exe")
+    if os.path.normcase(canonical_exe) != os.path.normcase(target_exe):
+        try:
+            if os.path.exists(canonical_exe):
+                shutil.copy2(target_exe, canonical_exe)
+                _ulog(f"synced canonical exe <- {target_exe}")
+        except Exception as e:
+            _ulog(f"warn: canonical sync failed: {e}")
 
     # 3. Запускаємо оновлений лаунчер і завершуємо поточний процес
     try:
